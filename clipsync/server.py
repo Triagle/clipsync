@@ -2,7 +2,7 @@ import heapq
 import json
 import socketserver
 
-import clip
+from clipsync import clip
 
 
 def clip_as_str(clip_obj):
@@ -47,7 +47,6 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
             json_data = json.loads(data)
         except json.JSONDecodeError:
             response = json.dumps({'err': f'{data} is not valid json.'}) + "\n"
-        print(json_data)
         if 'cmd' not in json_data and response is None:
             response = json.dumps({
                 'err':
@@ -55,5 +54,4 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
             }) + '\n'
         elif response is None:
             response = command_dispatch[json_data['cmd']](json_data)
-        print(repr(response))
         self.wfile.write(response.encode())

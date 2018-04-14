@@ -7,6 +7,6 @@ setup(
     install_requires=['Click', 'pygobject', 'sortedcontainers'],
     entry_points='''
         [console_scripts]
-        clipsync=clipsync.clipsync:cli
+        clipsync=clipsync.cli:cli
     ''',
 )

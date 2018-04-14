@@ -1,7 +1,6 @@
 import click
 
-import client
-import server
+from clipsync import client, server
 
 
 @click.group()

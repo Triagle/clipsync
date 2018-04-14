@@ -2,7 +2,7 @@ import json
 import socket
 import time
 
-import clip
+from clipsync import clip
 
 try:
     import gi

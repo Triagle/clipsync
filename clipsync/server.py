@@ -1,7 +1,7 @@
 import json
 import socketserver
 
-import clip
+from clipsync import clip
 from sortedcontainers import SortedList
 
 

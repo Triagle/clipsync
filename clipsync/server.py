@@ -20,6 +20,8 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
         super().__init__(request, client_address, server)
 
     def pull_clip(self, data):
+        if len(self.server.clipboard) == 0:
+            return json.dumps({'err': 'clipboard empty'}) + '\n'
         heap_clip = self.server.clipboard[0]
         corrected_clip = clip.Clip(-heap_clip.dt, heap_clip.contents)
         return clip_as_str(corrected_clip)
@@ -30,6 +32,8 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
         return self.pull_clip(data)
 
     def pop_clip(self, data):
+        if len(self.server.clipboard) == 0:
+            return json.dumps({'err': 'clipboard empty'}) + '\n'
         heap_clip = heapq.heappop(self.server.clipboard)
         corrected_clip = clip.Clip(-heap_clip.dt, heap_clip.contents)
         return clip_as_str(corrected_clip)

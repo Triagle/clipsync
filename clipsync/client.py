@@ -39,7 +39,11 @@ class Client:
             else:
                 wsock.write(PULL_CLIP)
                 wsock.close()
-            updated_clip = clip.Clip(**json.loads(rsock.readline()))
+            response_json = json.loads(rsock.readline())
+            if 'err' in response_json:
+                print(response_json['err'])
+                return True
+            updated_clip = clip.Clip(**response_json)
             clipboard.set_text(updated_clip.contents, -1)
             rsock.close()
         return True

@@ -8,8 +8,9 @@ name = "pypi"
 [packages]
 
 "flake8" = "*"
-pygobject = "*"
+PyGObject = "*"
 click = "*"
+sortedcontainers = "*"
 
 
 [dev-packages]

@@ -2,7 +2,8 @@ import heapq
 import json
 import socketserver
 
-from clipsync import clip
+import clip
+from sortedcontainers import SortedList
 
 
 def clip_as_str(clip_obj):
@@ -12,7 +13,7 @@ def clip_as_str(clip_obj):
 class ClipSyncServer(socketserver.TCPServer):
     def __init__(self, host_port, request_handler):
         super().__init__(host_port, request_handler)
-        self.clipboard = []
+        self.clipboard = SortedList(key=lambda c: c.dt)
 
 
 class ClipSyncTCP(socketserver.StreamRequestHandler):
@@ -20,23 +21,21 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
         super().__init__(request, client_address, server)
 
     def pull_clip(self, data):
-        if len(self.server.clipboard) == 0:
+        try:
+            return clip_as_str(self.server.clipboard[-1])
+        except IndexError:
             return json.dumps({'err': 'clipboard empty'}) + '\n'
-        heap_clip = self.server.clipboard[0]
-        corrected_clip = clip.Clip(-heap_clip.dt, heap_clip.contents)
-        return clip_as_str(corrected_clip)
 
     def push_clip(self, data):
-        new_clip = clip.Clip(dt=-int(data['dt']), contents=data['contents'])
-        heapq.heappush(self.server.clipboard, new_clip)
+        new_clip = clip.Clip(dt=int(data['dt']), contents=data['contents'])
+        self.server.clipboard.add(new_clip)
         return self.pull_clip(data)
 
     def pop_clip(self, data):
-        if len(self.server.clipboard) == 0:
+        try:
+            return clip_as_str(self.server.clipboard.pop())
+        except IndexError:
             return json.dumps({'err': 'clipboard empty'}) + '\n'
-        heap_clip = heapq.heappop(self.server.clipboard)
-        corrected_clip = clip.Clip(-heap_clip.dt, heap_clip.contents)
-        return clip_as_str(corrected_clip)
 
     def handle(self):
         command_dispatch = {

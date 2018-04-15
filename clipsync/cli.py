@@ -9,7 +9,7 @@ def cli():
 
     \b
     Examples:
-        clipsync server # server started on localhost:7071
+        clipsync server # Server started on localhost:7071.
         clipsync client # Connects to localhost:7071 and syncs clipboard.
     '''
     pass
@@ -28,10 +28,10 @@ def start_server(host, port):
 
     \b
     Examples:
-        clipsync server # server started on localhost:7071
-        clipsync server --host='0.0.0.0' # server started on 0.0.0.0:7071, global server
-        clipsync server --port 7070 # server started on localhost:7070
-        clipsync server --host='0.0.0.0' --port 7070 # server started on 0.0.0.0:7070
+        clipsync server # Server started on localhost:7071.
+        clipsync server --host='0.0.0.0' # Server started on 0.0.0.0:7071, global server.
+        clipsync server --port 7070 # Server started on localhost:7070.
+        clipsync server --host='0.0.0.0' --port 7070 # Server started on 0.0.0.0:7070.
     '''
     with server.ClipSyncServer((host, port), server.ClipSyncTCP) as server_cls:
         server_cls.serve_forever()

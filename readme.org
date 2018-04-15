@@ -1,0 +1,107 @@
+#+TITLE: Clipsync
+
+Clipsync - A simple tool to sync X11 clipboards across computers.
+
+Clipsync starts a small TCP server that clients can communicate with
+to keep a global clipboard in sync. You could for example copy text on
+your desktop and paste it on your laptop.
+
+* Who's it for?
+
+This tool has some upsides and some downsides. Clipsync is primarily
+for people who want a hassle free but effective system to sync
+clipboards between a small pool of devices you trust.
+
+*** Upsides
+
+- Small :: It's just a single python package with only a few lines of
+           code.
+- Simple :: Anyone with a little bit of python knowledge will grasp
+            how it works.
+- Easy :: It's easy to deploy, easy to manage, and easy to get going.
+
+*** Downsides
+
+- Simple :: Bit of a double edged sword, it's not packed full of
+            features, it does clipboard syncing and that's it.
+- Insecure :: No encryption here. Not so big of a deal if you're
+              deploying locally at home, but don't expect to be able
+              to hook it up to your Digital Ocean VPS without a little extra
+              configuration.
+- Probably others, but the point is made, this is not professional
+  software, just hobby scripts for someone who wanted to sync their clipboard.
+
+* Getting Started
+** Prerequisites
+You're going to need python and setuptools installed. Python packages
+are installed by the setup.py script.
+
+*** Required Packages
+- Click :: For a simple command line with documentation.
+- pygobject :: To interface with the clipboard (rather than Xlib
+               because I prefer sanity), will require the
+               gobject-introspection to compile properly.
+- sortedcontainers :: To provide the datastructures necessary to keep
+     the clipboard in sync.
+** Installing
+First clone the package:
+#+BEGIN_SRC shell
+  git clone https://github.com/Triagle/clipsync.git
+#+END_SRC
+
+Then run the install script:
+#+BEGIN_SRC shell
+  python setup.py install
+  # Or alternatively, if you have "pipsi" installed
+  pipsi install .
+#+END_SRC
+
+Run the script:
+#+BEGIN_SRC shell
+  $ clipsync --help
+  Usage: clipsync [OPTIONS] COMMAND [ARGS]...
+
+    Start clipsync client/server.
+
+    Examples:
+        clipsync server # Server started on localhost:7071.
+        clipsync client # Connects to localhost:7071 and syncs clipboard.
+
+  Options:
+    --help  Show this message and exit.
+
+  Commands:
+    client  Start clipsync client.
+    server  Start clipsync server.
+#+END_SRC
+* Usage
+Usage is fairly simple as fair as tools go. Simply open a shell and
+type:
+
+#+BEGIN_SRC shell
+  clipsync server
+#+END_SRC
+
+And you'll have a clipsync server running locally on your laptop
+listening on port 7071. By default the server binds to localhost, so
+you won't be able to access it externally. To do that pass the =--host=
+flag with the value =0.0.0.0=.
+
+#+BEGIN_SRC shell
+  clipsync server --host='0.0.0.0'
+#+END_SRC
+
+From any client computer you want to sync run the following command:
+
+#+BEGIN_SRC shell
+  clipsync client --host=<ip address of server>
+#+END_SRC
+
+The client is now running and will sync your clipboard with the server
+at the host you specified.
+
+More examples of usage are found in the CLI help output, pass =--help=
+to get these.
+
+* Meta
+Distributed under MIT License, see =LICENSE= file for info.

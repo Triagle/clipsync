@@ -40,7 +40,7 @@ are installed by the setup.py script.
 - Click :: For a simple command line with documentation.
 - pygobject :: To interface with the clipboard (rather than Xlib
                because I prefer sanity), will require the
-               gobject-introspection to compile properly.
+               gobject-introspection package to compile properly.
 - sortedcontainers :: To provide the datastructures necessary to keep
      the clipboard in sync.
 ** Installing

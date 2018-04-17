@@ -1,8 +1,9 @@
 import json
 import socketserver
 
-from clipsync import clip
 from sortedcontainers import SortedList
+
+from . import clip
 
 
 def clip_as_str(clip_obj):

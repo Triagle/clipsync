@@ -1,4 +1,5 @@
 import json
+import logging
 import socket
 import time
 
@@ -32,6 +33,8 @@ def sync_clipboard(server_hostname, server_port, last_text):
 
     Returns:
     bool: Whether GTK main loop should reset timeout. '''
+    logging.basicConfig()
+    logger = logging.getLogger('clipsync')
     clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
     with socket.socket() as sock:
         sock.connect((server_hostname, server_port))
@@ -61,8 +64,7 @@ def sync_clipboard(server_hostname, server_port, last_text):
         response_json = json.loads(rsock.readline())
         if 'err' in response_json:
             # An error has occured, print and reset timeout.
-            # TODO: rewrite with logging daemon.
-            print(response_json['err'])
+            logger.error(response_json['err'])
             return True, last_text
         # No error has occurred .: a successful clipboard item has
         # been returned.

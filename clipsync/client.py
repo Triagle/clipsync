@@ -17,62 +17,104 @@ except Exception:
 PULL_CLIP = json.dumps({'cmd': 'PULL'}) + '\n'
 
 
-def sync_clipboard(server_hostname, server_port, last_text):
-    ''' Sync clipboard with server.
+class Client:
+    ''' The Client object encapsulates state regarding clipboard syncing.
 
-    Basic procedure for syncing is as follows:
-    connect to server -> send current clipboard (if a change has occurred)
-    -> get current clipboard from server.
+    The Client builds a buffer that it sends to the server
+    regularly. Buffer modification happens the moment the clipboard
+    changes. '''
 
-    This ensures that the current clipboard item is always update to date.
+    def __init__(self, hostname, port):
+        ''' Create a new Client instance.
 
-    Args:
-    server_hostname (str): The hostname of the server to connect to, e.g 'localhost'
-    server_port (int): The port of the server to connect to, e.g 7071
-    last_text (str): The last text synced to the clipboard.
+        Args:
+            hostname (str): The hostname to connect to, e.g 'localhost'
+            port (int): The port to connect to, e.g 7071 '''
+        self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        self.clip_buffer = []
+        self.server_hostname = hostname
+        self.server_port = port
+        self._self_set = False
 
-    Returns:
-    bool: Whether GTK main loop should reset timeout. '''
-    logging.basicConfig()
-    logger = logging.getLogger('clipsync')
-    clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
-    with socket.socket() as sock:
-        sock.connect((server_hostname, server_port))
-        wsock = sock.makefile(mode='w')
-        rsock = sock.makefile()
-        new_text = clipboard.wait_for_text()
-        if new_text != last_text:
-            # New clipboard contents, create a clip object and
-            # push it to server.
-            dt = time.time()
-            clip_dict = clip.clip_as_dict(clip.Clip(dt, new_text))
-            # Append PUSH command to tell server we want to add
-            # this clip to the server clipboard.
-            clip_dict['cmd'] = 'PUSH'
-            # After those operations clip_dict looks like:
-            # clip_dict = {'cmd': 'PUSH', 'dt': now, 'contents': contents}
-            cmd_str = json.dumps(clip_dict) + '\n'
-            wsock.write(cmd_str)
-            wsock.close()
-            # No need to PULL here as the PUSH command returns the
-            # top clipboard item after pushing.
+    def run(self):
+        ''' Start an instance of the Client. '''
+        self.clipboard.connect('owner-change', self.push_clip_item)
+        GObject.timeout_add(5000, self.sync_clipboard)
+        Gtk.main()
+
+    def push_clip_item(self, clipboard, event):
+        ''' Push a clipboard item to the clipboard buffer.
+
+        Note:
+            This method is intended to be bound to the `owner-change` signal from `Gtk.Clipboard`
+
+        Args:
+            clipboard (Gtk.Clipboard): The emitter of the clipboard event (self.clipboard).
+            event (Gdk.EventOwnerChange): Information about the event (event time etc). '''
+        # Two cases, one the clipboard was updated by the client, and
+        # another when it was updated by some external application.
+        if self._self_set is False:
+            # Clipboard was updated by external application. Push to
+            # clipboard buffer.
+            new_text = self.clipboard.wait_for_text()
+            new_clip = clip.Clip(event.time, new_text)
+            self.clip_buffer.append(new_clip)
         else:
-            # No clipboard contents, but other devices may have
-            # changed so pull to update.
-            wsock.write(PULL_CLIP)
-            wsock.close()
-        response_json = json.loads(rsock.readline())
-        if 'err' in response_json:
-            # An error has occured, print and reset timeout.
-            logger.error(response_json['err'])
-            return True, last_text
-        # No error has occurred .: a successful clipboard item has
-        # been returned.
-        updated_clip = clip.Clip(**response_json)
-        clipboard.set_text(updated_clip.contents, -1)
-        clipboard.store()
-        rsock.close()
-        return True, updated_clip.contents
+            # Clipboard was updated by the client, unset this flag to
+            # allow the next event (maybe not by client) to be handled
+            # properly.
+            self._self_set = False
+
+    def sync_clipboard(self):
+        ''' Sync clipboard with server.
+
+        Basic procedure for syncing is as follows:
+        connect to server -> send current clipboard (if a change has occurred)
+        -> get current clipboard from server.
+
+        This ensures that the current clipboard item is always update to date.
+
+        Note:
+            This method should be bound to a timeout via `GObject.timeout_add`.
+
+        Returns:
+               bool: Whether or not to renew the GObject timer, True to renew, False otherwise. '''
+        logging.basicConfig()
+        logger = logging.getLogger('clipsync')
+        with socket.socket() as sock:
+            sock.connect((self.server_hostname, self.server_port))
+            wsock = sock.makefile(mode='w')
+            rsock = sock.makefile()
+            if len(self.clip_buffer) > 0:
+                # New clipboard contents, create a command and
+                # push it to server.
+                command = {'cmd': 'PUSH', 'data': self.clip_buffer}
+                cmd_str = json.dumps(command, default=clip.json_encode) + '\n'
+                wsock.write(cmd_str)
+                wsock.close()
+                self.clip_buffer.clear()
+                # No need to PULL here as the PUSH command returns the
+                # top clipboard item after pushing.
+            else:
+                # No clipboard contents, but other devices may have
+                # changed so pull to update.
+                wsock.write(PULL_CLIP)
+                wsock.close()
+            response_json = json.loads(rsock.readline())
+            if 'err' in response_json:
+                # An error has occured, print and reset timeout.
+                logger.error(response_json['err'])
+            else:
+                # No error has occurred .: a successful clipboard item has
+                # been returned.
+                updated_clip = clip.Clip(**response_json)
+                # Let self.push_clip_item know that the clipboard has
+                # been updated by the program.
+                self._self_set = True
+                self.clipboard.set_text(updated_clip.contents, -1)
+                self.clipboard.store()
+                rsock.close()
+        return True
 
 
 def start_client(hostname, port):
@@ -85,12 +127,5 @@ def start_client(hostname, port):
         hostname (str): The host name of the clipsync server instance (e.g 'localhost')
         port (int): The port to connect to (e.g 7071)
     '''
-    last_text = None
-
-    def sync_client():
-        nonlocal last_text
-        reset, last_text = sync_clipboard(hostname, port, last_text)
-        return reset
-
-    GObject.timeout_add(5000, sync_client)
-    Gtk.main()
+    client = Client(hostname, port)
+    client.run()

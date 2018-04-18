@@ -20,7 +20,7 @@ def clip_as_str(clip_obj):
         >>> clip_as_str(clip)
         '{"dt": 1, "contents": "clipboard example"}\n'
     '''
-    return json.dumps(clip.clip_as_dict(clip_obj)) + '\n'
+    return json.dumps(clip_obj, default=clip.json_encode) + '\n'
 
 
 class ClipSyncServer(socketserver.TCPServer):
@@ -46,7 +46,7 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
     def pull_clip(self, data):
         ''' Pull the latest clip from the sorted clipboard.
         Args:
-            data (dict): JSON request data
+            data (dict): JSON request data. Ignored.
         Returns:
             dict: JSON representing either clip on success, or a JSON error object, to be passed to client
         '''
@@ -58,18 +58,20 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
     def push_clip(self, data):
         ''' Push a clip onto sorted clipboard.
         Args:
-            data (dict): JSON request data, in this case the clipboard to push.
+            data (list of dict): A list of JSON clip objects, encoded as per `clip.encode_clip`
         Returns:
             dict: The top clip on the clipboard (see `ClipSyncTCP.pull_clip`) for details.
         '''
-        new_clip = clip.Clip(dt=int(data['dt']), contents=data['contents'])
-        self.server.clipboard.add(new_clip)
+        for clip_data in data:
+            new_clip = clip.Clip(
+                dt=int(clip_data['dt']), contents=clip_data['contents'])
+            self.server.clipboard.add(new_clip)
         return self.pull_clip(data)
 
     def pop_clip(self, data):
         ''' Pop the latest clip from the sorted clipboard. Modifies clipboard.
         Args:
-            data (dict): JSON request data
+            data (dict): JSON request data. Ignored.
         Returns:
             dict: JSON representing either clip on success, or a JSON
             error object, to be passed to client.
@@ -85,11 +87,10 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
 
             {
                 'cmd': cmd, # PULL|PUSH|POP
-                'dt': dt, # float/int representing time of clip on client
-                'contents': contents # contents of clip from client
+                'data': data # Clipboard items, ...
             }
 
-        `dt` and `contents` field are omitted for POP/PULL requests.
+        The `data` field is omitted for POP/PULL requests.
         Responses are either a JSON error object or the successful
         response from the appropriate method.
 
@@ -123,5 +124,6 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
                 f'Must specify command in json request.'
             }) + '\n'
         elif response is None:
-            response = command_dispatch[json_data['cmd']](json_data)
+            response = command_dispatch[json_data['cmd']](json_data.get(
+                'data', None))
         self.wfile.write(response.encode())

@@ -13,6 +13,8 @@ try:
 except Exception:
     pass
 
+DEFAULT_MAX_CLIPBOARD_ITEM_SIZE = 1e6
+
 # Hardcoded constant to call command to pull clipboard from server.
 PULL_CLIP = json.dumps({'cmd': 'PULL'}) + '\n'
 
@@ -24,14 +26,19 @@ class Client:
     regularly. Buffer modification happens the moment the clipboard
     changes. '''
 
-    def __init__(self, hostname, port):
+    def __init__(self,
+                 hostname,
+                 port,
+                 max_clipboard_item_size=DEFAULT_MAX_CLIPBOARD_ITEM_SIZE):
         ''' Create a new Client instance.
 
         Args:
             hostname (str): The hostname to connect to, e.g 'localhost'
-            port (int): The port to connect to, e.g 7071 '''
+            port (int): The port to connect to, e.g 7071
+            max_clipboard_item_size (int): The maximum size (in bytes) that any clipboard item can be. '''
         self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
         self.clip_buffer = []
+        self.max_clipboard_item_size = max_clipboard_item_size
         self.server_hostname = hostname
         self.server_port = port
         self._self_set = False
@@ -53,11 +60,11 @@ class Client:
             event (Gdk.EventOwnerChange): Information about the event (event time etc). '''
         # Two cases, one the clipboard was updated by the client, and
         # another when it was updated by some external application.
-        if self._self_set is False:
+        new_text = self.clipboard.wait_for_text()
+        new_clip = clip.Clip(event.time, new_text)
+        if self._self_set is False and new_clip.size < self.max_clipboard_item_size:
             # Clipboard was updated by external application. Push to
             # clipboard buffer.
-            new_text = self.clipboard.wait_for_text()
-            new_clip = clip.Clip(event.time, new_text)
             self.clip_buffer.append(new_clip)
         else:
             # Clipboard was updated by the client, unset this flag to
@@ -117,7 +124,7 @@ class Client:
         return True
 
 
-def start_client(hostname, port):
+def start_client(hostname, port, max_clip_item_size):
     ''' Start a client instance connecting to `hostname`:`port` for
     pushing/pulling clips.
 
@@ -127,5 +134,5 @@ def start_client(hostname, port):
         hostname (str): The host name of the clipsync server instance (e.g 'localhost')
         port (int): The port to connect to (e.g 7071)
     '''
-    client = Client(hostname, port)
+    client = Client(hostname, port, max_clip_item_size)
     client.run()

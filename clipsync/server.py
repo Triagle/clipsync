@@ -5,6 +5,9 @@ from sortedcontainers import SortedList
 
 from . import clip
 
+# Maximum size of clipboard list in bytes, default 5 megabytes
+CLIPBOARD_DEFAULT_MAX = 5000000
+
 
 def clip_as_str(clip_obj):
     ''' Convert a clipboard object to a JSON formatted string (plus newline).
@@ -29,11 +32,32 @@ class ClipSyncServer(socketserver.TCPServer):
 
     Attributes:
         clipboard (:obj:`SortedList` of :obj:`Clip`): A clipboard list sorted by clip datetime.
+        clipboard_max (int): The maximum size of the clipboard in memory (as bytes).
+        clipboard_current (int): The current size of the clipboard in memory (as bytes).
     '''
 
-    def __init__(self, host_port, request_handler):
+    def __init__(self,
+                 host_port,
+                 request_handler,
+                 clipboard_max=CLIPBOARD_DEFAULT_MAX):
+        ''' Initialize a new clip sync server.
+
+        Args:
+            host_port ((string, int)): The hostname and port to bind to.
+            request_handler (socketserver.BaseRequestHandler): The request handler class to call to when requests occur.
+            clipboard_max (int, optional): The maximum clipboard size in memory (as bytes). '''
         super().__init__(host_port, request_handler)
         self.clipboard = SortedList()
+        self.clipboard_max = clipboard_max
+        self.clipboard_current = 0
+
+    def trim_clipboard(self):
+        ''' Trims clipboard until the size of the clipboard history is
+        less than the maximum size allowed. '''
+        while self.clipboard_current > self.clipboard_max and len(
+                self.clipboard) > 0:
+            item = self.clipboard.pop(0)
+            self.clipboard_current -= item.size
 
 
 class ClipSyncTCP(socketserver.StreamRequestHandler):
@@ -66,6 +90,8 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
             new_clip = clip.Clip(
                 dt=int(clip_data['dt']), contents=clip_data['contents'])
             self.server.clipboard.add(new_clip)
+            self.server.clipboard_current += new_clip.size
+        self.server.trim_clipboard()
         return self.pull_clip(data)
 
     def pop_clip(self, data):

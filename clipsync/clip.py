@@ -24,6 +24,21 @@ class Clip:
         self.dt = dt
         self.contents = contents
 
+    @property
+    def size(self):
+        ''' Return the length of the clipboard contents in bytes.
+
+        Returns:
+            int: The size of the clipboard in bytes.
+
+        Examples:
+            >>> clip = Clip(dt=1523769986, contents='testing the clūpboard')
+            >>> len(clip.contents)
+            21
+            >>> clip.size
+            22 '''
+        return len(self.contents.encode())
+
     def __le__(self, other):
         return self.dt < other.dt
 

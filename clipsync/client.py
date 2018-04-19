@@ -62,8 +62,8 @@ class Client:
         # Two cases, one the clipboard was updated by the client, and
         # another when it was updated by some external application.
         new_text = self.clipboard.wait_for_text()
-        self.last_clipboard_change = event.time
-        new_clip = clip.Clip(event.time, new_text)
+        self.last_clipboard_change = int(time.time())
+        new_clip = clip.Clip(self.last_clipboard_change, new_text)
 
         if self._self_set is False and new_clip.size < self.max_clipboard_item_size:
             # Clipboard was updated by external application. Push to

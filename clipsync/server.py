@@ -1,5 +1,4 @@
 import json
-import socketserver
 
 from sortedcontainers import SortedList
 
@@ -26,7 +25,7 @@ def clip_as_str(clip_obj):
     return json.dumps(clip_obj, default=clip.json_encode) + '\n'
 
 
-class ClipSyncServer(socketserver.TCPServer):
+class ClipSyncServer:
     ''' ClipSyncServer object holds global server data, i.e the clipboard.
     See socketserver.TCPServer for more details.
 
@@ -36,17 +35,11 @@ class ClipSyncServer(socketserver.TCPServer):
         clipboard_current (int): The current size of the clipboard in memory (as bytes).
     '''
 
-    def __init__(self,
-                 host_port,
-                 request_handler,
-                 clipboard_max=CLIPBOARD_DEFAULT_MAX):
+    def __init__(self, clipboard_max=CLIPBOARD_DEFAULT_MAX):
         ''' Initialize a new clip sync server.
 
         Args:
-            host_port ((string, int)): The hostname and port to bind to.
-            request_handler (socketserver.BaseRequestHandler): The request handler class to call to when requests occur.
             clipboard_max (int, optional): The maximum clipboard size in memory (as bytes). '''
-        super().__init__(host_port, request_handler)
         self.clipboard = SortedList()
         self.clipboard_max = clipboard_max
         self.clipboard_current = 0
@@ -59,14 +52,6 @@ class ClipSyncServer(socketserver.TCPServer):
             item = self.clipboard.pop(0)
             self.clipboard_current -= item.size
 
-
-class ClipSyncTCP(socketserver.StreamRequestHandler):
-    ''' Simple stream based clipboard request handler.
-    The `ClipSyncTCP.handle` method actually handles TCP requests, see
-    that method for documentation on request handling.
-    For more information on request handlers see `socketserver.StreamRequestHandler`.
-    '''
-
     def pull_clip(self, data):
         ''' Pull the latest clip from the sorted clipboard.
         Args:
@@ -75,7 +60,7 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
             dict: JSON representing either clip on success, or a JSON error object, to be passed to client
         '''
         try:
-            return clip_as_str(self.server.clipboard[-1])
+            return clip_as_str(self.clipboard[-1])
         except IndexError:
             return json.dumps({'err': 'clipboard empty'}) + '\n'
 
@@ -89,9 +74,9 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
         for clip_data in data:
             new_clip = clip.Clip(
                 dt=int(clip_data['dt']), contents=clip_data['contents'])
-            self.server.clipboard.add(new_clip)
-            self.server.clipboard_current += new_clip.size
-        self.server.trim_clipboard()
+            self.clipboard.add(new_clip)
+            self.clipboard_current += new_clip.size
+        self.trim_clipboard()
         return self.pull_clip(data)
 
     def pop_clip(self, data):
@@ -103,11 +88,11 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
             error object, to be passed to client.
         '''
         try:
-            return clip_as_str(self.server.clipboard.pop())
+            return clip_as_str(self.clipboard.pop())
         except IndexError:
             return json.dumps({'err': 'clipboard empty'}) + '\n'
 
-    def handle(self):
+    async def handle(self, rfile, wfile):
         ''' Handle a new TCP request.
         Requests are json objects that follow a simple structure::
 
@@ -131,13 +116,19 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
         The appropriate method call is decided by a command dispatch,
         a dictionary mapping the value of the `cmd` field to a method
         call.
+
+        Args:
+            rfile (asyncio.StreamReader): A stream to read client data from.
+            wfile (asyncio.StreamWriter): A stream to write data to
+                                          the client asynchronously.
         '''
         command_dispatch = {
             'PULL': self.pull_clip,
             'PUSH': self.push_clip,
             'POP': self.pop_clip
         }
-        data = self.rfile.readline().strip()
+        data = await rfile.readline()
+        data = data.strip()
         json_data = {}
         response = None
         try:
@@ -152,4 +143,6 @@ class ClipSyncTCP(socketserver.StreamRequestHandler):
         elif response is None:
             response = command_dispatch[json_data['cmd']](json_data.get(
                 'data', None))
-        self.wfile.write(response.encode())
+        wfile.write(response.encode())
+        await wfile.drain()
+        wfile.close()

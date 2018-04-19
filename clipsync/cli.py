@@ -1,3 +1,4 @@
+import asyncio
 import re
 
 import click
@@ -75,10 +76,20 @@ def start_server(host, port, max_clipboard_size):
         clipsync server --port 7070 # Server started on localhost:7070.
         clipsync server --host='0.0.0.0' --port 7070 # Server started on 0.0.0.0:7070.
     '''
-    with server.ClipSyncServer(
-        (host, port), server.ClipSyncTCP,
-            clipboard_max=max_clipboard_size) as server_cls:
-        server_cls.serve_forever()
+    clip_server = server.ClipSyncServer(clipboard_max=max_clipboard_size)
+    loop = asyncio.get_event_loop()
+    coroutine = asyncio.start_server(
+        clip_server.handle, host=host, port=port, loop=loop)
+    socket_server = loop.run_until_complete(coroutine)
+
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+
+    socket_server.close()
+    loop.run_until_complete(socket_server.wait_closed())
+    loop.close()
 
 
 @cli.command('client')

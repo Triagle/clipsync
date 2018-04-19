@@ -13,7 +13,7 @@ try:
 except Exception:
     pass
 
-DEFAULT_MAX_CLIPBOARD_ITEM_SIZE = 1e6
+DEFAULT_MAX_CLIPBOARD_ITEM_SIZE = int(1e6)
 
 # Hardcoded constant to call command to pull clipboard from server.
 PULL_CLIP = json.dumps({'cmd': 'PULL'}) + '\n'

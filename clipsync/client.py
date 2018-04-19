@@ -42,6 +42,7 @@ class Client:
         self.server_hostname = hostname
         self.server_port = port
         self._self_set = False
+        self.last_clipboard_change = time.time()
 
     def run(self):
         ''' Start an instance of the Client. '''
@@ -61,7 +62,9 @@ class Client:
         # Two cases, one the clipboard was updated by the client, and
         # another when it was updated by some external application.
         new_text = self.clipboard.wait_for_text()
+        self.last_clipboard_change = event.time
         new_clip = clip.Clip(event.time, new_text)
+
         if self._self_set is False and new_clip.size < self.max_clipboard_item_size:
             # Clipboard was updated by external application. Push to
             # clipboard buffer.
@@ -111,16 +114,22 @@ class Client:
             if 'err' in response_json:
                 # An error has occured, print and reset timeout.
                 logger.error(response_json['err'])
-            else:
-                # No error has occurred .: a successful clipboard item has
-                # been returned.
-                updated_clip = clip.Clip(**response_json)
+                return True
+            # No error has occurred .: a successful clipboard item has
+            # been returned.
+            updated_clip = clip.Clip(**response_json)
+            # Because the server does not necessarily have a
+            # *complete* history of the clipboard (especially if
+            # certain clippings have been exempted for being too
+            # large), we only update if the server has a newer clip than
+            # the last clipboard change.
+            if updated_clip.dt > self.last_clipboard_change:
                 # Let self.push_clip_item know that the clipboard has
                 # been updated by the program.
                 self._self_set = True
                 self.clipboard.set_text(updated_clip.contents, -1)
                 self.clipboard.store()
-                rsock.close()
+            rsock.close()
         return True
 
 

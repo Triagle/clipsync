@@ -92,7 +92,14 @@ def start_server(host, port, max_clipboard_size):
     metavar='PORT',
     default=7071,
     help='Port to connect to, e.g 7070')
-def start_client(host, port):
+@click.option(
+    '--max-clip-item-size',
+    metavar='SIZE',
+    default=str(server.DEFAULT_MAX_CLIPBOARD_ITEM_SIZE),
+    help=
+    "Maximum size of any item on the clipboard to push to the server, e.g '5mb' or '5gb'",
+    callback=lambda ctx, p, value: parse_size(value))
+def start_client(host, port, max_clip_item_size):
     ''' Start clipsync client.
 
     \b
@@ -100,7 +107,7 @@ def start_client(host, port):
         clipsync client # Connects to localhost:7071 and syncs clipboard.
         clipsync client --host='192.168.2.1' --port=7070 # Connects to 192.168.2.1:7070 and syncs clipboard.
     '''
-    client.start_client(host, port)
+    client.start_client(host, port, max_clip_item_size)
 
 
 if __name__ == '__main__':

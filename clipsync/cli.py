@@ -95,7 +95,7 @@ def start_server(host, port, max_clipboard_size):
 @click.option(
     '--max-clip-item-size',
     metavar='SIZE',
-    default=str(server.DEFAULT_MAX_CLIPBOARD_ITEM_SIZE),
+    default=str(client.DEFAULT_MAX_CLIPBOARD_ITEM_SIZE),
     help=
     "Maximum size of any item on the clipboard to push to the server, e.g '5mb' or '5gb'",
     callback=lambda ctx, p, value: parse_size(value))
